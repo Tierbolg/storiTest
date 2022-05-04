@@ -27,7 +27,7 @@ def lambda_handler(event, context):
          PARAMS = {"Id":line[0], "Date":line[1], "Transaction":line[2]}
          # sending get request and saving the response as response object
          r = requests.put(url = URL, data=json.dumps(PARAMS), headers=headers)
-         print(r.text)
+         #print(r.text)
          
         
         #After preserve all the info in the Database, proceed to calculate
@@ -51,7 +51,7 @@ def lambda_handler(event, context):
             datetime_object = datetime.datetime.strptime(month_num, "%m")
             full_month_name = datetime_object.strftime("%B")
             print('Number of transactions in {}: {}'.format(full_month_name,month_transactions.count(month_num)))
-            #final_dict['month-']=month_transactions.count(month_num)
+            final_dict['month-'+full_month_name]=month_transactions.count(month_num)
             
         
         total_balance=0
@@ -70,35 +70,54 @@ def lambda_handler(event, context):
         final_dict["avg_debit"]=round(sum(debit_list)/len(debit_list),2)
         final_dict["avg_credit"]=round(sum(credit_list)/len(credit_list),2)
         print(final_dict)
-        #send_email()
+        
+        send_email(format_body(final_dict))
         return response['ContentType']
     except Exception as e:
         print(e)
         print('Error getting object {} from bucket {}. Make sure they exist and your bucket is in the same region as this function.'.format(key, bucket))
         raise e
 
+# =============================================================================
+# GENERATE FINAL BODY FOR EMAIL
+# =============================================================================
+def format_body(final_dict):
+    
+    start='Greetings for Stori!\nPlease find the summary information of your account:\n'
+    balance='Total Balance is {}\n'.format(final_dict['total_balance'])
+    avg_cred='Average credit amount:  {}\n'.format(final_dict['avg_credit'])
+    avg_debt='Average debit amount:  {}\n'.format(final_dict['avg_debit'])
+    finalString=start+balance+avg_cred+avg_debt
+    keys_obtained=final_dict.keys()
+    print(keys_obtained)
+    for key_obt in keys_obtained: 
+        key_format=key_obt.split("-")
+        if len(key_format)>1 and key_format[0]=="month":
+            finalString=finalString+'Number of transactions in {}: {}\n'.format(key_format[1],final_dict[key_obt])
+    
+    ending='\n--Please dont respond to this email, instead you can contact to @stori_mx'
+    finalString=finalString+ending
+    print (finalString)
+    return finalString
+
+
+# =============================================================================
+# END OF GENERATE FINAL BODY FOR EMAIL
+# =============================================================================
 
 
 # =============================================================================
 # SEND EMAIL FUNCTION
 # =============================================================================
-def send_email():
+def send_email(body_text):
     
     gmail_user = 'gilvefi@gmail.com'
     gmail_app_password = "fwqltuutrfwdcicl"
     sent_from = gmail_user
     sent_to = ['gilbertovelazquez@live.com.mx']
     sent_subject = "Account balance for Stori"
-    sent_body = """\
-Greetings!
-
-Cela ressemble à un excellent recipie[1] déjeuner.
-
-[1] http://www.yummly.com/recipe/Roasted-Asparagus-Epicurious-203718
-
---Please don't respond to this email, instead you can contact to @stori_mx
-"""
-
+    sent_body=body_text
+    
     email_text = """\
 From: %s
 To: %s
